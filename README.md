@@ -30,7 +30,7 @@ npm test
 You should see Cucumber running the tests and producing some logs ending with a summary looking like this:
 
 ```
-5 scenarios (5 passed)
-45 steps (45 passed)
-1m22.954s (executing steps: 1m22.882s)
+7 scenarios (7 passed)
+55 steps (55 passed)
+1m41.615s (executing steps: 1m41.527s)
 ```

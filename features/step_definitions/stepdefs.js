@@ -2,6 +2,7 @@ const assert = require('assert');
 const { BigNumber } = require('bignumber.js');
 const { Given, When, Then, setDefaultTimeout } = require('@cucumber/cucumber');
 
+// Set default Cucumber step timeout.
 setDefaultTimeout(60 * 1000);
 
 const {
@@ -21,7 +22,10 @@ const {
     TokenAssociateTransaction,
     TransferTransaction,
     StatusError,
-    AccountId
+    AccountId,
+    TopicMessageSubmitTransaction,
+    TopicMessageQuery,
+    KeyList
 } = require("@hashgraph/sdk");
 require('dotenv').config({ path: '.env' });
 
@@ -31,13 +35,6 @@ const myPrivateKey = PrivateKey.fromString(process.env.MY_PRIVATE_KEY);
 if (myAccountId == null || myPrivateKey == null ) {
     throw new Error("Environment variables MY_ACCOUNT_ID and MY_PRIVATE_KEY must be present");
 }
-
-//const otherAccountId = process.env.OTHER_ACCOUNT_ID;
-//const otherPrivateKey = PrivateKey.fromString(process.env.OTHER_PRIVATE_KEY);
-
-//if (otherAccountId == null || otherPrivateKey == null) {
-//    throw new Error("Environment variables OTHER_ACCOUNT_ID and OTHER_PRIVATE_KEY must be present");
-//}
 
 const adminUserAccountId = myAccountId;
 const adminUserAccountPrivateKey = myPrivateKey;
@@ -78,6 +75,8 @@ let fourthAccountId, fourthAccountPrivateKey;
 
 let testTokenId;
 let tokenTransferTransaction;
+let testTopicId;
+let thresholdKey;
 
 async function initTreasuryAccount(client) {
   if (treasuryAccountId && treasuryAccountPrivateKey)
@@ -274,36 +273,6 @@ async function queryTokenBalance(accountId, tokenId) {
     return accountBalances.tokens.get(tokenId);
 }
 
-Given('A first hedera account with more than {int} hbar and {int} HTT tokens',
-  async function (minHbarAmount, httAmount) {
-    await createFirstAccount(client, minHbarAmount + 1)
-    await checkMinHbarAmount(firstAccountId, minHbarAmount);
-    await associateAccountWithToken (client, testTokenId, firstAccountId, firstAccountPrivateKey);
-    await transferTokens(client, testTokenId, httAmount, firstAccountId,
-                         treasuryAccountId, treasuryAccountPrivateKey);
-  }
-);
-
-Given('a first account with more than {int} hbars', async function (minHbarAmount) {
-  await createFirstAccount(client, minHbarAmount + 1)
-  await checkMinHbarAmount(firstAccountId, minHbarAmount);
-});
-
-Given('A first account with more than {int} hbars', async function (minHbarAmount) {
-  await createFirstAccount(client, minHbarAmount + 1)
-  await checkMinHbarAmount(firstAccountId, minHbarAmount);
-});
-
-Given('A Hedera account with more than {int} hbar', async function (minHbarAmount) {
-  await createFirstAccount(client, minHbarAmount + 1)
-  await checkMinHbarAmount(firstAccountId, minHbarAmount);
-});
-
-Given('A first hedera account with more than {int} hbar', async function (minHbarAmount) {
-  await createFirstAccount(client, minHbarAmount + 1)
-  await checkMinHbarAmount(firstAccountId, minHbarAmount);
-});
-
 async function createTokenTransferTransaction (
   client, sourceAccountId, sourceAccountPrivateKey,
   targetAccountId, tokenId, amount
@@ -355,6 +324,95 @@ async function transferTokens(client, tokenId, amount, targetAccountId,
   const tokenTransferRx = await tokenTransferSubmit.getReceipt(client);
 }
 
+async function createTopic(memo, submitKey) {
+    const transactionId = await new TopicCreateTransaction()
+      .setTopicMemo("Taxi rides")
+      .setAdminKey(myPrivateKey.publicKey)
+      .setSubmitKey(firstAccountPrivateKey.publicKey)
+      .setAutoRenewAccountId(myAccountId)
+      .execute(client);
+    const receipt = await transactionId.getReceipt(client);
+
+    console.log(`\n============ TopicCreateTransaction: ${JSON.stringify(receipt)}`);
+
+    const topicId = receipt.topicId;
+
+    console.log(`\n ======== New topic ID is ${topicId.toString()}`);
+
+    testTopicId = topicId;
+}
+
+async function publishMessage(message) {
+  const client = Client.forTestnet();
+  client.setOperator(firstAccountId, firstAccountPrivateKey);
+  // Submit the message to the topic
+  const transactionId = await new TopicMessageSubmitTransaction()
+    .setTopicId(testTopicId)
+    .setMessage(message)
+    .freezeWith(client); // Freeze the transaction to allow manual signing
+
+  // Sign with the submit key
+  const signTx = await transactionId.sign(firstAccountPrivateKey);
+
+  // Execute the transaction
+  const receipt = await signTx.execute(client);
+
+  console.log(`\n ======== The status of message submission: ${JSON.stringify(receipt)}`);
+}
+
+async function receiveMessage() {
+  // Wait 5 seconds between consensus topic creation and subscription
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  // Create a new topic message query that continuously polls the network for any new messages on the topic
+  const subscriptionHandle = new TopicMessageQuery()
+    .setTopicId(testTopicId)
+    .setStartTime(0) // optional, this is unix timestamp (seconds since 1970-01-01T00:00:00Z)
+    .subscribe(
+      client,
+      (message) => {
+        console.log(`=============== Received message: ${message.contents}`);
+        subscriptionHandle.unsubscribe();
+      },
+      (error) => {
+        console.error(`Error receiving message: ${JSON.stringify(error)}`);
+        throw new Error(`Error receiving topic message: ${error}`);
+      }
+    );
+}
+
+/////////////////////////////////////////////////////////////////////
+////////////////////// Step definitions /////////////////////////////
+
+Given('A first hedera account with more than {int} hbar and {int} HTT tokens',
+  async function (minHbarAmount, httAmount) {
+    await createFirstAccount(client, minHbarAmount + 1)
+    await checkMinHbarAmount(firstAccountId, minHbarAmount);
+    await associateAccountWithToken (client, testTokenId, firstAccountId, firstAccountPrivateKey);
+    await transferTokens(client, testTokenId, httAmount, firstAccountId,
+                         treasuryAccountId, treasuryAccountPrivateKey);
+  }
+);
+
+Given('a first account with more than {int} hbars', async function (minHbarAmount) {
+  await createFirstAccount(client, minHbarAmount + 1)
+  await checkMinHbarAmount(firstAccountId, minHbarAmount);
+});
+
+Given('A first account with more than {int} hbars', async function (minHbarAmount) {
+  await createFirstAccount(client, minHbarAmount + 1)
+  await checkMinHbarAmount(firstAccountId, minHbarAmount);
+});
+
+Given('A Hedera account with more than {int} hbar', async function (minHbarAmount) {
+  await createFirstAccount(client, minHbarAmount + 1)
+  await checkMinHbarAmount(firstAccountId, minHbarAmount);
+});
+
+Given('A first hedera account with more than {int} hbar', async function (minHbarAmount) {
+  await createFirstAccount(client, minHbarAmount + 1)
+  await checkMinHbarAmount(firstAccountId, minHbarAmount);
+});
 
 Given('The first account holds {int} HTT tokens', async function (amount) {
   await associateAccountWithToken (client, testTokenId, firstAccountId, firstAccountPrivateKey);
@@ -372,37 +430,32 @@ Given('The first account holds {int} HTT tokens', async function (amount) {
 
 When('A topic is created with the memo {string} with the first account as the submit key',
   async function (memo) {
-  //  await createTopic(memo);
-  return 'Pending';
+    await createTopic(memo, firstAccountPrivateKey.publicKey);
 });
 
- When('The message {string} is published to the topic', function (string) {
-   // Write code here that turns the phrase above into concrete actions
-   return 'pending';
- });
+When('The message {string} is published to the topic', async function (message) {
+  await publishMessage(message);
+});
 
- Then('The message is received by the topic and can be printed to the console', function () {
-   // Write code here that turns the phrase above into concrete actions
-   return 'pending';
- });
-
+Then('The message is received by the topic and can be printed to the console', async function () {
+  await receiveMessage();
+});
 
 Given('A second account with more than {int} hbars', async function (minHbarAmount) {
   await createSecondAccount(client, minHbarAmount + 1);
   await checkMinHbarAmount(secondAccountId, minHbarAmount);
 });
 
- Given('A {int} of {int} threshold key with the first and second account', function (int, int2) {
- // Given('A {int} of {float} threshold key with the first and second account', function (int, float) {
- // Given('A {float} of {int} threshold key with the first and second account', function (float, int) {
- // Given('A {float} of {float} threshold key with the first and second account', function (float, float2) {
-   // Write code here that turns the phrase above into concrete actions
-   return 'pending';
- });
+Given('A {int} of {int} threshold key with the first and second account',
+  async function (requiredSignatures, numberOfKeys) {
+    assert(numberOfKeys === 2, "The way the step is defined currently requires number of keys to be 2 (first and second account)");
+    assert(requiredSignatures == 1 || requiredSignatures == 2, "Currently requiredSignatures can only be 1 or 2");
 
- When('A topic is created with the memo {string} with the threshold key as the submit key', function (string) {
-   // Write code here that turns the phrase above into concrete actions
-   return 'pending';
+    thresholdKey = new KeyList([firstAccountPrivateKey.publicKey, secondAccountPrivateKey.publicKey], requiredSignatures);
+});
+
+ When('A topic is created with the memo {string} with the threshold key as the submit key', async function (memo) {
+    await createTopic(memo, thresholdKey);
  });
 
 When('I create a token named Test Token \\(HTT)', async function () {
