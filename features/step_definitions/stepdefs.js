@@ -29,88 +29,99 @@ const {
 } = require("@hashgraph/sdk");
 require('dotenv').config({ path: '.env' });
 
-const myAccountId = process.env.MY_ACCOUNT_ID;
-const myPrivateKey = PrivateKey.fromString(process.env.MY_PRIVATE_KEY);
 
-if (myAccountId == null || myPrivateKey == null ) {
-    throw new Error("Environment variables MY_ACCOUNT_ID and MY_PRIVATE_KEY must be present");
-}
 
-const adminUserAccountId = myAccountId;
-const adminUserAccountPrivateKey = myPrivateKey;
-const adminUserAccountPublicKey = adminUserAccountPrivateKey.publicKey;
-const adminUser = new Wallet(adminUserAccountId, adminUserAccountPrivateKey);
+class GlobalState {
+  constructor() {
+    this.myAccountId = process.env.MY_ACCOUNT_ID;
+    this.myPrivateKey = PrivateKey.fromString(process.env.MY_PRIVATE_KEY);
 
-const supplyUserAccountId = myAccountId;
-const supplyUserAccountPrivateKey = myPrivateKey
-const supplyUserAccountPublicKey = supplyUserAccountPrivateKey.publicKey;
-const supplyUser = new Wallet(supplyUserAccountId, supplyUserAccountPrivateKey);
+    if (!this.myAccountId || !this.myPrivateKey) {
+      throw new Error("Environment variables MY_ACCOUNT_ID and MY_PRIVATE_KEY must be present");
+    }
 
-async function createAccount (client, initialBalance) {
-  const accountPrivateKey = PrivateKey.generateED25519();
+    this.adminUserAccountId = this.myAccountId;
+    this.adminUserAccountPrivateKey = this.myPrivateKey;
+    this.adminUserAccountPublicKey = this.adminUserAccountPrivateKey.publicKey;
+    this.adminUser = new Wallet(this.adminUserAccountId, this.adminUserAccountPrivateKey);
+
+    this.supplyUserAccountId = this.myAccountId;
+    this.supplyUserAccountPrivateKey = this.myPrivateKey
+    this.supplyUserAccountPublicKey = this.supplyUserAccountPrivateKey.publicKey;
+    this.supplyUser = new Wallet(this.supplyUserAccountId, this.supplyUserAccountPrivateKey); 
+    
+    this.treasuryAccountId = null;
+    this.treasuryAccountPrivateKey = null;
+
+    this.firstAccountId = null;
+    this.firstAccountPrivateKey = null;
+    this.secondAccountId = null;
+    this.secondAccountPrivateKey = null;
+    this.thirdAccountId = null;
+    this.thirdAccountPrivateKey = null;
+    this.fourthAccountId = null;
+    this.fourthAccountPrivateKey = null;
+
+    this.testTokenId = null;
+    this.tokenTransferTransaction = null;
+    this.testTopicId = null;
+    this.thresholdKey = null;
+    // Create our connection to the Hedera network
+    // The Hedera JS SDK makes this really easy!
+    this.client = Client.forTestnet();
+    this.client.setOperator(this.myAccountId, this.myPrivateKey);
+
+    console.log(`=================== CTOR OK ===================`);
+  }
+
+  async createAccount (client, initialBalance) {
+    const accountPrivateKey = PrivateKey.generateED25519();
   
-  const response = await new AccountCreateTransaction()
-    .setInitialBalance(new Hbar(initialBalance))
-    .setKey(accountPrivateKey)
-    .execute(client);
+    const response = await new AccountCreateTransaction()
+      .setInitialBalance(new Hbar(initialBalance))
+      .setKey(accountPrivateKey)
+      .execute(client);
   
-  const receipt = await response.getReceipt(client);
+    const receipt = await response.getReceipt(client);
 
-  console.log(`createAccount: ${JSON.stringify(receipt)}`);
+    console.log(`createAccount: ${JSON.stringify(receipt)}`);
   
-  return [receipt.accountId, accountPrivateKey];
+    return [receipt.accountId, accountPrivateKey];
  }
 
-// Create our connection to the Hedera network
-// The Hedera JS SDK makes this really easy!
-const client = Client.forTestnet();
-client.setOperator(myAccountId, myPrivateKey);
-
-let treasuryAccountId, treasuryAccountPrivateKey;
-
-let firstAccountId, firstAccountPrivateKey;
-let secondAccountId, secondAccountPrivateKey;
-let thirdAccountId, thirdAccountPrivateKey;
-let fourthAccountId, fourthAccountPrivateKey;
-
-let testTokenId;
-let tokenTransferTransaction;
-let testTopicId;
-let thresholdKey;
-
-async function initTreasuryAccount(client) {
-  if (treasuryAccountId && treasuryAccountPrivateKey)
+async initTreasuryAccount(client) {
+  if (this.treasuryAccountId && this.treasuryAccountPrivateKey)
     return;
-  [treasuryAccountId, treasuryAccountPrivateKey] = await createAccount(client, 500);
+  [this.treasuryAccountId, this.treasuryAccountPrivateKey] = await this.createAccount(client, 500);
 }
 
-async function createFirstAccount(client, initialBalance) {
-  await initTreasuryAccount(client);
-  [firstAccountId, firstAccountPrivateKey] = await createAccount(client, initialBalance)
+async createFirstAccount(client, initialBalance) {
+  await this.initTreasuryAccount(client);
+  [this.firstAccountId, this.firstAccountPrivateKey] = await this.createAccount(client, initialBalance)
 }
 
-async function createSecondAccount(client, initialBalance) {
-  await initTreasuryAccount(client);
-  [secondAccountId, secondAccountPrivateKey] = await createAccount(client, initialBalance)
+async createSecondAccount(client, initialBalance) {
+  await this.initTreasuryAccount(client);
+  [this.secondAccountId, this.secondAccountPrivateKey] = await this.createAccount(client, initialBalance)
 }
 
-async function createThirdAccount(client, initialBalance) {
-  await initTreasuryAccount(client);
-  [thirdAccountId, thirdAccountPrivateKey] = await createAccount(client, initialBalance)
+async createThirdAccount(client, initialBalance) {
+  await this.initTreasuryAccount(client);
+  [this.thirdAccountId, this.thirdAccountPrivateKey] = await this.createAccount(client, initialBalance)
 }
 
-async function createFourthAccount(client, initialBalance) {
-  await initTreasuryAccount(client);
-  [fourthAccountId, fourthAccountPrivateKey] = await createAccount(client, initialBalance)
+async createFourthAccount(client, initialBalance) {
+  await this.initTreasuryAccount(client);
+  [this.fourthAccountId, this.fourthAccountPrivateKey] = await this.createAccount(client, initialBalance)
 }
 
-async function checkMinHbarAmount(accountId, minHbarAmount) {
+async checkMinHbarAmount(accountId, minHbarAmount) {
     // Create the query
     const query = new AccountBalanceQuery()
      .setAccountId(accountId);
 
     // Sign with the client operator account private key and submit to a Hedera network
-    const accountBalance = await query.execute(client);
+    const accountBalance = await query.execute(gs.client);
     const accountBalanceHbar = accountBalance.hbars.toBigNumber();
     if (accountBalance) {
         console.log(`The account balance for account ${accountId} is ${accountBalanceHbar} HBar`);
@@ -121,12 +132,12 @@ async function checkMinHbarAmount(accountId, minHbarAmount) {
     `Account should have at least ${minHbarAmount} but has only ${accountBalanceHbar}`)
 }
 
-async function queryTokenFunction(functionName, tokenId) {
+async queryTokenFunction(functionName, tokenId) {
     const query = new TokenInfoQuery()
         .setTokenId(tokenId);
 
     console.log("retrieving the " + functionName);
-    const body = await query.execute(client);
+    const body = await query.execute(this.client);
 
     const result = functionName === "name" ? body.name
                  : functionName === "symbol" ? body.symbol
@@ -137,26 +148,26 @@ async function queryTokenFunction(functionName, tokenId) {
     return result
 }
 
-async function checkTokenHasName(tokenId, name) {
-  const tokenName = await queryTokenFunction("name", tokenId);
+async checkTokenHasName(tokenId, name) {
+  const tokenName = await this.queryTokenFunction("name", tokenId);
   assert(name === tokenName, `Test token has name "${tokenName}", expected "${name}"`)
   return true;
 }
 
-async function checkTokenHasSymbol(tokenId, symbol) {
-  const tokenSymbol = await queryTokenFunction("symbol", tokenId);
+async checkTokenHasSymbol(tokenId, symbol) {
+  const tokenSymbol = await this.queryTokenFunction("symbol", tokenId);
   assert(symbol === tokenSymbol, `Test token has symbol "${tokenSymbol}", expected "${symbol}"`)
   return true;
 }
 
-async function checkTokenHasDecimals(tokenId, decimals) {
-  const tokenDecimals = await queryTokenFunction("decimals", tokenId);
+async checkTokenHasDecimals(tokenId, decimals) {
+  const tokenDecimals = await this.queryTokenFunction("decimals", tokenId);
   assert(decimals === tokenDecimals, `Test token has decimals "${tokenDecimals}", expected "${decimals}"`)
   return true;
 }
 
-async function checkTokenAdminKey(tokenId, adminKey) {
-  const tokenAdminKey = await queryTokenFunction("adminKey", tokenId);
+async checkTokenAdminKey(tokenId, adminKey) {
+  const tokenAdminKey = await this.queryTokenFunction("adminKey", tokenId);
 
   console.log(`====> ${JSON.stringify({tokenAdminKey})}`);
 
@@ -165,8 +176,8 @@ async function checkTokenAdminKey(tokenId, adminKey) {
   return true;
 }
 
-async function checkTokenTotalSupply(tokenId, totalSupply) {
-  const tokenTotalSupply = await queryTokenFunction("totalSupply", tokenId);
+async checkTokenTotalSupply(tokenId, totalSupply) {
+  const tokenTotalSupply = await this.queryTokenFunction("totalSupply", tokenId);
   console.log(`typeof tokenTotalSupply:  ${typeof tokenTotalSupply}`);
   console.log('---------------');
   console.log(JSON.stringify(tokenTotalSupply));
@@ -177,20 +188,20 @@ async function checkTokenTotalSupply(tokenId, totalSupply) {
   );
 }
 
-async function mintTokens(tokenId, amount) {
-  const initialSupply = await queryTokenFunction("totalSupply", tokenId);
+async mintTokens(tokenId, amount) {
+  const initialSupply = await this.queryTokenFunction("totalSupply", tokenId);
   // Create the transaction and freeze for manual signing
 
   const treasuryClient = Client.forTestnet();
-  treasuryClient.setOperator(treasuryAccountId, treasuryAccountPrivateKey);
+  treasuryClient.setOperator(this.treasuryAccountId, this.treasuryAccountPrivateKey);
 
   const transaction = new TokenMintTransaction()
         .setTokenId(tokenId)
         .setAmount(amount)
-        .freezeWith(client);
+        .freezeWith(this.client);
 
   // Sign the transaction with the client, who is set as admin and treasury account
-  const signTx = await transaction.sign(treasuryAccountPrivateKey);
+  const signTx = await transaction.sign(this.treasuryAccountPrivateKey);
 
   // Submit the signed transaction to a Hedera network
   const txResponse = await signTx.execute(treasuryClient);
@@ -203,7 +214,7 @@ async function mintTokens(tokenId, amount) {
 
   console.log("The mint transaction consensus status is ", transactionStatus);
 
-  const finalSupply = await queryTokenFunction("totalSupply", tokenId);
+  const finalSupply = await this.queryTokenFunction("totalSupply", tokenId);
 
   console.log(`initialSupply  : ${initialSupply}`)
   console.log(`finalSupply  : ${finalSupply}`)
@@ -212,68 +223,68 @@ async function mintTokens(tokenId, amount) {
     + ` final supply should be ${initialSupply.add(amount)}, was ${finalSupply}`);
 }
 
-async function createTestToken(name, symbol, supply, fixedSupply) {
+async createTestToken(name, symbol, supply, fixedSupply) {
   // Create the transaction and freeze for manual signing
-  console.log(`adminUser ----> ${JSON.stringify(adminUser)}`)
-  console.log(`supplyUser ----> ${JSON.stringify(supplyUser)}`)
+  console.log(`adminUser ----> ${JSON.stringify(this.adminUser)}`)
+  console.log(`supplyUser ----> ${JSON.stringify(this.supplyUser)}`)
   const transaction = new TokenCreateTransaction()
       .setTokenName(name)
       .setTokenSymbol(symbol)
       .setTokenType(TokenType.FungibleCommon)
-      .setTreasuryAccountId(treasuryAccountId)
+      .setTreasuryAccountId(this.treasuryAccountId)
       .setInitialSupply(supply)
-      .setAdminKey(supplyUserAccountPublicKey)
-      .setSupplyKey(supplyUserAccountPublicKey);
+      .setAdminKey(this.supplyUserAccountPublicKey)
+      .setSupplyKey(this.supplyUserAccountPublicKey);
 
   if (fixedSupply) {
     transaction.setMaxSupply(supply);
     transaction.setSupplyType(TokenSupplyType.Finite);
   }
 
-  transaction.freezeWith(client);
+  transaction.freezeWith(this.client);
 
   // Sign the transaction with the client, who is set as admin and treasury account
-  const signTx = await transaction.sign(treasuryAccountPrivateKey);
+  const signTx = await transaction.sign(this.treasuryAccountPrivateKey);
 
   // Submit to a Hedera network
-  const txResponse = await signTx.execute(client);
+  const txResponse = await signTx.execute(this.client);
 
   // Get the receipt of the transaction
-  const receipt = await txResponse.getReceipt(client);
+  const receipt = await txResponse.getReceipt(this.client);
 
   // Get the token ID from the receipt
   const tokenId = receipt.tokenId;
 
-  testTokenId = tokenId;
+  this.testTokenId = tokenId;
 
   console.log("The new token ID is " + tokenId);
 
-  const tokenName = await queryTokenFunction("name", tokenId);
-  const tokenSymbol = await queryTokenFunction("symbol", tokenId);
-  const tokenSupply = await queryTokenFunction("totalSupply", tokenId);
+  const tokenName = await this.queryTokenFunction("name", tokenId);
+  const tokenSymbol = await this.queryTokenFunction("symbol", tokenId);
+  const tokenSupply = await this.queryTokenFunction("totalSupply", tokenId);
   console.log('The total supply of the ' + tokenName + ' token is ' + tokenSupply + ' of ' + tokenSymbol);
 
   // Create the query
   const balanceQuery = new AccountBalanceQuery()
-      .setAccountId(adminUserAccountId);
+      .setAccountId(this.adminUserAccountId);
 
   // Sign with the client operator private key and submit to a Hedera network
-  const tokenBalance = await balanceQuery.execute(client);
+  const tokenBalance = await balanceQuery.execute(this.client);
 
   console.log("The balance of the user is: " + tokenBalance.tokens.get(tokenId));
 
 }
 
-async function queryTokenBalance(accountId, tokenId) {
+async queryTokenBalance(accountId, tokenId) {
     const balanceQuery = new AccountBalanceQuery()
         .setAccountId(accountId);
 
-    const accountBalances = await balanceQuery.execute(client);
+    const accountBalances = await balanceQuery.execute(this.client);
 
     return accountBalances.tokens.get(tokenId);
 }
 
-async function createTokenTransferTransaction (
+async createTokenTransferTransaction (
   client, sourceAccountId, sourceAccountPrivateKey,
   targetAccountId, tokenId, amount
 ) {
@@ -285,13 +296,13 @@ async function createTokenTransferTransaction (
   return tokenTransferTx;  
 }
 
-async function submitTransaction(client, tokenTransferTx) {
+async submitTransaction(client, tokenTransferTx) {
   const tokenTransferSubmit = await tokenTransferTx.execute(client);
   const tokenTransferReceipt = await tokenTransferSubmit.getReceipt(client);
   return tokenTransferReceipt;
 }
 
-async function associateAccountWithToken (client, tokenId, targetAccountId, targetAccountPrivateKey) {
+async associateAccountWithToken (client, tokenId, targetAccountId, targetAccountPrivateKey) {
     try {
         const associateTx = await new TokenAssociateTransaction()
           .setAccountId(targetAccountId)
@@ -312,7 +323,7 @@ async function associateAccountWithToken (client, tokenId, targetAccountId, targ
     }
 }
 
-async function transferTokens(client, tokenId, amount, targetAccountId,
+async transferTokens(client, tokenId, amount, targetAccountId,
                               treasuryAccountId, treasuryAccountPrivateKey) {
   const tokenTransferTx = await new TransferTransaction()
     .addTokenTransfer(tokenId, treasuryAccountId, -amount)
@@ -324,14 +335,14 @@ async function transferTokens(client, tokenId, amount, targetAccountId,
   const tokenTransferRx = await tokenTransferSubmit.getReceipt(client);
 }
 
-async function createTopic(memo, submitKey) {
+async createTopic(memo, submitKey) {
     const transactionId = await new TopicCreateTransaction()
       .setTopicMemo("Taxi rides")
-      .setAdminKey(myPrivateKey.publicKey)
-      .setSubmitKey(firstAccountPrivateKey.publicKey)
-      .setAutoRenewAccountId(myAccountId)
-      .execute(client);
-    const receipt = await transactionId.getReceipt(client);
+      .setAdminKey(this.myPrivateKey.publicKey)
+      .setSubmitKey(this.firstAccountPrivateKey.publicKey)
+      .setAutoRenewAccountId(this.myAccountId)
+      .execute(this.client);
+    const receipt = await transactionId.getReceipt(this.client);
 
     console.log(`\n============ TopicCreateTransaction: ${JSON.stringify(receipt)}`);
 
@@ -339,37 +350,37 @@ async function createTopic(memo, submitKey) {
 
     console.log(`\n ======== New topic ID is ${topicId.toString()}`);
 
-    testTopicId = topicId;
+    this.testTopicId = topicId;
 }
 
-async function publishMessage(message) {
+async publishMessage(message) {
   const client = Client.forTestnet();
-  client.setOperator(firstAccountId, firstAccountPrivateKey);
+  client.setOperator(this.firstAccountId, this.firstAccountPrivateKey);
   // Submit the message to the topic
   const transactionId = await new TopicMessageSubmitTransaction()
-    .setTopicId(testTopicId)
+    .setTopicId(this.testTopicId)
     .setMessage(message)
-    .freezeWith(client); // Freeze the transaction to allow manual signing
+    .freezeWith(this.client); // Freeze the transaction to allow manual signing
 
   // Sign with the submit key
-  const signTx = await transactionId.sign(firstAccountPrivateKey);
+  const signTx = await transactionId.sign(this.firstAccountPrivateKey);
 
   // Execute the transaction
-  const receipt = await signTx.execute(client);
+  const receipt = await signTx.execute(this.client);
 
   console.log(`\n ======== The status of message submission: ${JSON.stringify(receipt)}`);
 }
 
-async function receiveMessage() {
+async receiveMessage() {
   // Wait 5 seconds between consensus topic creation and subscription
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
   // Create a new topic message query that continuously polls the network for any new messages on the topic
   const subscriptionHandle = new TopicMessageQuery()
-    .setTopicId(testTopicId)
+    .setTopicId(this.testTopicId)
     .setStartTime(0) // optional, this is unix timestamp (seconds since 1970-01-01T00:00:00Z)
     .subscribe(
-      client,
+      this.client,
       (message) => {
         console.log(`=============== Received message: ${message.contents}`);
         subscriptionHandle.unsubscribe();
@@ -381,69 +392,75 @@ async function receiveMessage() {
     );
 }
 
+
+}
+
+const gs = new GlobalState();
+
+
 /////////////////////////////////////////////////////////////////////
 ////////////////////// Step definitions /////////////////////////////
 
 Given('A first hedera account with more than {int} hbar and {int} HTT tokens',
   async function (minHbarAmount, httAmount) {
-    await createFirstAccount(client, minHbarAmount + 1)
-    await checkMinHbarAmount(firstAccountId, minHbarAmount);
-    await associateAccountWithToken (client, testTokenId, firstAccountId, firstAccountPrivateKey);
-    await transferTokens(client, testTokenId, httAmount, firstAccountId,
-                         treasuryAccountId, treasuryAccountPrivateKey);
+    await gs.createFirstAccount(gs.client, minHbarAmount + 1)
+    await gs.checkMinHbarAmount(gs.firstAccountId, minHbarAmount);
+    await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.firstAccountId, gs.firstAccountPrivateKey);
+    await gs.transferTokens(gs.client, gs.testTokenId, httAmount, gs.firstAccountId,
+                         gs.treasuryAccountId, gs.treasuryAccountPrivateKey);
   }
 );
 
 Given('a first account with more than {int} hbars', async function (minHbarAmount) {
-  await createFirstAccount(client, minHbarAmount + 1)
-  await checkMinHbarAmount(firstAccountId, minHbarAmount);
+  await gs.createFirstAccount(gs.client, minHbarAmount + 1)
+  await gs.checkMinHbarAmount(gs.firstAccountId, minHbarAmount);
 });
 
 Given('A first account with more than {int} hbars', async function (minHbarAmount) {
-  await createFirstAccount(client, minHbarAmount + 1)
-  await checkMinHbarAmount(firstAccountId, minHbarAmount);
+  await gs.createFirstAccount(gs.client, minHbarAmount + 1)
+  await gs.checkMinHbarAmount(gs.firstAccountId, minHbarAmount);
 });
 
 Given('A Hedera account with more than {int} hbar', async function (minHbarAmount) {
-  await createFirstAccount(client, minHbarAmount + 1)
-  await checkMinHbarAmount(firstAccountId, minHbarAmount);
+  await gs.createFirstAccount(gs.client, minHbarAmount + 1)
+  await gs.checkMinHbarAmount(gs.firstAccountId, minHbarAmount);
 });
 
 Given('A first hedera account with more than {int} hbar', async function (minHbarAmount) {
-  await createFirstAccount(client, minHbarAmount + 1)
-  await checkMinHbarAmount(firstAccountId, minHbarAmount);
+  await gs.createFirstAccount(gs.client, minHbarAmount + 1)
+  await gs.checkMinHbarAmount(gs.firstAccountId, minHbarAmount);
 });
 
 Given('The first account holds {int} HTT tokens', async function (amount) {
-  await associateAccountWithToken (client, testTokenId, firstAccountId, firstAccountPrivateKey);
-  const targetAccountBalance = await queryTokenBalance(firstAccountId, testTokenId);
+  await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.firstAccountId, gs.firstAccountPrivateKey);
+  const targetAccountBalance = await gs.queryTokenBalance(gs.firstAccountId, gs.testTokenId);
   console.log("targetAccountBalance: ${targetAccountBalance}")
   console.log("amount: ${amount}")
   if (targetAccountBalance < amount) {
-    await transferTokens(client, testTokenId, amount - targetAccountBalance,
-                        firstAccountId, treasuryAccountId, treasuryAccountPrivateKey);
+    await gs.transferTokens(gs.client, gs.testTokenId, amount - targetAccountBalance,
+                            gs.firstAccountId, gs.treasuryAccountId, gs.treasuryAccountPrivateKey);
   } else {
-    await transferTokens(client, testTokenId, targetAccountBalance - amount,
-                        treasuryAccountId, firstAccountId, firstAccountPrivateKey);
+    await gs.transferTokens(gs.client, gs.testTokenId, targetAccountBalance - amount,
+                         gs.treasuryAccountId, gs.firstAccountId, gs.firstAccountPrivateKey);
   }
 });
 
 When('A topic is created with the memo {string} with the first account as the submit key',
   async function (memo) {
-    await createTopic(memo, firstAccountPrivateKey.publicKey);
+    await gs.createTopic(memo, gs.firstAccountPrivateKey.publicKey);
 });
 
 When('The message {string} is published to the topic', async function (message) {
-  await publishMessage(message);
+  await gs.publishMessage(message);
 });
 
 Then('The message is received by the topic and can be printed to the console', async function () {
-  await receiveMessage();
+  await gs.receiveMessage();
 });
 
 Given('A second account with more than {int} hbars', async function (minHbarAmount) {
-  await createSecondAccount(client, minHbarAmount + 1);
-  await checkMinHbarAmount(secondAccountId, minHbarAmount);
+  await gs.createSecondAccount(gs.client, minHbarAmount + 1);
+  await gs.checkMinHbarAmount(gs.secondAccountId, minHbarAmount);
 });
 
 Given('A {int} of {int} threshold key with the first and second account',
@@ -451,109 +468,109 @@ Given('A {int} of {int} threshold key with the first and second account',
     assert(numberOfKeys === 2, "The way the step is defined currently requires number of keys to be 2 (first and second account)");
     assert(requiredSignatures == 1 || requiredSignatures == 2, "Currently requiredSignatures can only be 1 or 2");
 
-    thresholdKey = new KeyList([firstAccountPrivateKey.publicKey, secondAccountPrivateKey.publicKey], requiredSignatures);
+    gs.thresholdKey = new KeyList([gs.firstAccountPrivateKey.publicKey, gs.secondAccountPrivateKey.publicKey], requiredSignatures);
 });
 
  When('A topic is created with the memo {string} with the threshold key as the submit key', async function (memo) {
-    await createTopic(memo, thresholdKey);
+    await gs.createTopic(memo, gs.thresholdKey);
  });
 
 When('I create a token named Test Token \\(HTT)', async function () {
-  await createTestToken("Test Token", 'HTT', 1000, false);
+  await gs.createTestToken("Test Token", 'HTT', 1000, false);
 });
 
 Given('A token named Test Token \\(HTT) with {int} tokens',
   async function (tokenSupply) {
-    await initTreasuryAccount(client);
-    return await createTestToken("Test Token", 'HTT', tokenSupply, false);
+    await gs.initTreasuryAccount(gs.client);
+    return await gs.createTestToken("Test Token", 'HTT', tokenSupply, false);
 });
 
 When('I create a fixed supply token named Test Token \\(HTT) with {int} tokens',
   async function (tokenSupply) {
-    return await createTestToken("Test Token", 'HTT', tokenSupply, true);
+    return await gs.createTestToken("Test Token", 'HTT', tokenSupply, true);
 });
 
 Then('The token has the name {string}', async function (name) {
-  return await checkTokenHasName(testTokenId, name);
+  return await gs.checkTokenHasName(gs.testTokenId, name);
 });
 
 Then('The token has the symbol {string}', async function (symbol) {
-  return await checkTokenHasSymbol(testTokenId, symbol);
+  return await gs.checkTokenHasSymbol(gs.testTokenId, symbol);
 });
 
 Then('The token has {int} decimals', async function (decimals) {
-  return await checkTokenHasDecimals(testTokenId, decimals);
+  return await gs.checkTokenHasDecimals(gs.testTokenId, decimals);
 });
 
 Then('The token is owned by the account', async function () {
-  await checkTokenAdminKey(testTokenId, adminUserAccountPublicKey);
+  await gs.checkTokenAdminKey(gs.testTokenId, gs.adminUserAccountPublicKey);
 });
 
 Then('An attempt to mint {int} additional tokens succeeds', async function (tokenAmount) {
-  await mintTokens(testTokenId, tokenAmount);
+  await gs.mintTokens(gs.testTokenId, tokenAmount);
 });
 
 Then('The total supply of the token is {int}', async function (totalSupply) {
-  await checkTokenTotalSupply(testTokenId, totalSupply);
+  await gs.checkTokenTotalSupply(gs.testTokenId, totalSupply);
 });
 
 Then('An attempt to mint tokens fails', async function () {
-  const initialSupply = await queryTokenFunction("totalSupply", testTokenId);
+  const initialSupply = await gs.queryTokenFunction("totalSupply", gs.testTokenId);
   try {
-    await mintTokens(testTokenId, 10000);
+    await gs.mintTokens(gs.testTokenId, 10000);
     throw new Error("Should throw TOKEN_MAX_SUPPLY_REACHED");
   } catch (error) {
     console.log(`error: ${JSON.stringify(error)}`);
     // OK, expected.
   }
-  await checkTokenTotalSupply(testTokenId, initialSupply.toInt());
+  await gs.checkTokenTotalSupply(gs.testTokenId, initialSupply.toInt());
 });
 
 Given('A second Hedera account', async function () {
   // Initial HBAR balance not specified, let's assume it's 0.
-  await createSecondAccount(client, 0);
+  await gs.createSecondAccount(gs.client, 0);
 });
 
 Given('The second account holds {int} HTT tokens', async function (amount) {
-  await associateAccountWithToken (client, testTokenId, secondAccountId, secondAccountPrivateKey);
-  await transferTokens(client, testTokenId, amount, secondAccountId,
-                       treasuryAccountId, treasuryAccountPrivateKey);
+  await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.secondAccountId, gs.secondAccountPrivateKey);
+  await gs.transferTokens(gs.client, gs.testTokenId, amount, gs.secondAccountId,
+                          gs.treasuryAccountId, gs.treasuryAccountPrivateKey);
 });
 
 Then('The third account holds {int} HTT tokens', async function (amount) {
-  const actualAmount = await queryTokenBalance(thirdAccountId, testTokenId);
+  const actualAmount = await gs.queryTokenBalance(gs.thirdAccountId, gs.testTokenId);
   assert(actualAmount == amount, `Third account holds ${actualAmount} HTT, expected ${amount}`)
 });
 
 Then('The fourth account holds {int} HTT tokens', async function (amount) {
-  const actualAmount = await queryTokenBalance(fourthAccountId, testTokenId);
+  const actualAmount = await gs.queryTokenBalance(gs.fourthAccountId, gs.testTokenId);
   assert(actualAmount == amount, `Fourth account holds ${actualAmount} HTT, expected ${amount}`)
 });
 
 
 When('The first account creates a transaction to transfer {int} HTT tokens to the second account',
   async function (amount) {
-    await associateAccountWithToken (client, testTokenId, secondAccountId, secondAccountPrivateKey);
-    tokenTransferTransaction = await createTokenTransferTransaction(
-      client, firstAccountId, firstAccountPrivateKey,
-      secondAccountId, testTokenId, amount
+    await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.secondAccountId, gs.secondAccountPrivateKey);
+    gs.tokenTransferTransaction = await gs.createTokenTransferTransaction(
+      gs.client, gs.firstAccountId, gs.firstAccountPrivateKey,
+      gs.secondAccountId, gs.testTokenId, amount
     )
 });
 
 When('The first account submits the transaction', async function () {
   const client = Client.forTestnet();
-  client.setOperator(firstAccountId, firstAccountPrivateKey);
+  client.setOperator(gs.firstAccountId, gs.firstAccountPrivateKey);
 
-  await tokenTransferTransaction.sign(firstAccountPrivateKey)
-  const tokenTransferReceipt = await submitTransaction(client, tokenTransferTransaction); 
+  await gs.tokenTransferTransaction.sign(gs.firstAccountPrivateKey)
+  const tokenTransferReceipt = await gs.submitTransaction(client, gs.tokenTransferTransaction); 
 });
 
 When('The second account creates a transaction to transfer {int} HTT tokens to the first account', async function (amount) {
-    await associateAccountWithToken (client, testTokenId, firstAccountId, firstAccountPrivateKey);
-    await associateAccountWithToken (client, testTokenId, secondAccountId, secondAccountPrivateKey);
-    tokenTransferTransaction = await createTokenTransferTransaction(
-      client, secondAccountId, secondAccountPrivateKey,
-      firstAccountId, testTokenId, amount
+    await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.firstAccountId, gs.firstAccountPrivateKey);
+    await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.secondAccountId, gs.secondAccountPrivateKey);
+    gs.tokenTransferTransaction = await gs.createTokenTransferTransaction(
+      gs.client, gs.secondAccountId, gs.secondAccountPrivateKey,
+      gs.firstAccountId, gs.testTokenId, amount
     )
 });
 
@@ -563,26 +580,26 @@ Then('The first account has paid for the transaction fee', async function () {
 
 Given('A second Hedera account with {int} hbar and {int} HTT tokens',
   async function (hbarAmount, httAmount) {
-    await createSecondAccount(client, hbarAmount);
-    await associateAccountWithToken (client, testTokenId, secondAccountId, secondAccountPrivateKey);
-    await transferTokens(client, testTokenId, httAmount, secondAccountId,
-                         treasuryAccountId, treasuryAccountPrivateKey);
+    await gs.createSecondAccount(gs.client, hbarAmount);
+    await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.secondAccountId, gs.secondAccountPrivateKey);
+    await gs.transferTokens(gs.client, gs.testTokenId, httAmount, gs.secondAccountId,
+                            gs.treasuryAccountId, gs.treasuryAccountPrivateKey);
 });
 
 Given('A third Hedera account with {int} hbar and {int} HTT tokens',
   async function (hbarAmount, httAmount) {
-    await createThirdAccount(client, hbarAmount);
-    await associateAccountWithToken (client, testTokenId, thirdAccountId, thirdAccountPrivateKey);
-    await transferTokens(client, testTokenId, httAmount, thirdAccountId,
-                         treasuryAccountId, treasuryAccountPrivateKey);
+    await gs.createThirdAccount(gs.client, hbarAmount);
+    await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.thirdAccountId, gs.thirdAccountPrivateKey);
+    await gs.transferTokens(gs.client, gs.testTokenId, httAmount, gs.thirdAccountId,
+                         gs.treasuryAccountId, gs.treasuryAccountPrivateKey);
 });
 
 Given('A fourth Hedera account with {int} hbar and {int} HTT tokens',
   async function (hbarAmount, httAmount) {
-    await createFourthAccount(client, hbarAmount);
-    await associateAccountWithToken (client, testTokenId, fourthAccountId, fourthAccountPrivateKey);
-    await transferTokens(client, testTokenId, httAmount, fourthAccountId,
-                         treasuryAccountId, treasuryAccountPrivateKey);
+    await gs.createFourthAccount(gs.client, hbarAmount);
+    await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.fourthAccountId, gs.fourthAccountPrivateKey);
+    await gs.transferTokens(gs.client, gs.testTokenId, httAmount, gs.fourthAccountId,
+                         gs.treasuryAccountId, gs.treasuryAccountPrivateKey);
 });
 
 When('A transaction is created to transfer {int} HTT tokens out of the first and second account'
@@ -590,30 +607,30 @@ When('A transaction is created to transfer {int} HTT tokens out of the first and
      +' and {int} HTT tokens into the fourth account',
   async function (firstAndSecondOutflowAmount, thirdInflowAmount, fourthInflowAmount) {
 
-    await associateAccountWithToken (client, testTokenId, thirdAccountId, thirdAccountPrivateKey);
-    await associateAccountWithToken (client, testTokenId, fourthAccountId, fourthAccountPrivateKey);
+    await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.thirdAccountId, gs.thirdAccountPrivateKey);
+    await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.fourthAccountId, gs.fourthAccountPrivateKey);
 
 
     const nodeId = AccountId.fromString("0.0.3");
 
     const tx = new TransferTransaction()
-      .addTokenTransfer(testTokenId, firstAccountId, -firstAndSecondOutflowAmount)
-      .addTokenTransfer(testTokenId, secondAccountId, -firstAndSecondOutflowAmount)
-      .addTokenTransfer(testTokenId, thirdAccountId, thirdInflowAmount)
-      .addTokenTransfer(testTokenId, fourthAccountId, fourthInflowAmount)
+      .addTokenTransfer(gs.testTokenId, gs.firstAccountId, -firstAndSecondOutflowAmount)
+      .addTokenTransfer(gs.testTokenId, gs.secondAccountId, -firstAndSecondOutflowAmount)
+      .addTokenTransfer(gs.testTokenId, gs.thirdAccountId, thirdInflowAmount)
+      .addTokenTransfer(gs.testTokenId, gs.fourthAccountId, fourthInflowAmount)
       .setNodeAccountIds([nodeId])
-      .freezeWith(client)
+      .freezeWith(gs.client)
       ;
 
-    const signature1 = firstAccountPrivateKey.signTransaction(tx);  
-    const signature2 = secondAccountPrivateKey.signTransaction(tx);  
-    const signature3 = thirdAccountPrivateKey.signTransaction(tx); 
-    const signature4 = fourthAccountPrivateKey.signTransaction(tx); 
+    const signature1 = gs.firstAccountPrivateKey.signTransaction(tx);  
+    const signature2 = gs.secondAccountPrivateKey.signTransaction(tx);  
+    const signature3 = gs.thirdAccountPrivateKey.signTransaction(tx); 
+    const signature4 = gs.fourthAccountPrivateKey.signTransaction(tx); 
 
-    tx.addSignature(firstAccountPrivateKey.publicKey, signature1);
-    tx.addSignature(secondAccountPrivateKey.publicKey, signature2);
-    tx.addSignature(thirdAccountPrivateKey.publicKey, signature3);
-    tx.addSignature(fourthAccountPrivateKey.publicKey, signature4);
+    tx.addSignature(gs.firstAccountPrivateKey.publicKey, signature1);
+    tx.addSignature(gs.secondAccountPrivateKey.publicKey, signature2);
+    tx.addSignature(gs.thirdAccountPrivateKey.publicKey, signature3);
+    tx.addSignature(gs.fourthAccountPrivateKey.publicKey, signature4);
     
-    tokenTransferTransaction = tx;
+    gs.tokenTransferTransaction = tx;
 });
