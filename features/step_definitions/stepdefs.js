@@ -30,7 +30,6 @@ const {
 require('dotenv').config({ path: '.env' });
 
 
-
 class GlobalState {
   constructor() {
     this.myAccountId = process.env.MY_ACCOUNT_ID;
@@ -169,8 +168,6 @@ async checkTokenHasDecimals(tokenId, decimals) {
 async checkTokenAdminKey(tokenId, adminKey) {
   const tokenAdminKey = await this.queryTokenFunction("adminKey", tokenId);
 
-  console.log(`====> ${JSON.stringify({tokenAdminKey})}`);
-
   assert(adminKey.toString() === tokenAdminKey.toString(),
    `Test token has adminKey "${tokenAdminKey}", expected "${adminKey}"`)
   return true;
@@ -178,11 +175,6 @@ async checkTokenAdminKey(tokenId, adminKey) {
 
 async checkTokenTotalSupply(tokenId, totalSupply) {
   const tokenTotalSupply = await this.queryTokenFunction("totalSupply", tokenId);
-  console.log(`typeof tokenTotalSupply:  ${typeof tokenTotalSupply}`);
-  console.log('---------------');
-  console.log(JSON.stringify(tokenTotalSupply));
-  console.log(JSON.stringify(totalSupply));
-  console.log('---------------');
   assert(tokenTotalSupply.toInt() === totalSupply,
     `Total supply is ${tokenTotalSupply}, expected ${totalSupply}`
   );
@@ -190,8 +182,8 @@ async checkTokenTotalSupply(tokenId, totalSupply) {
 
 async mintTokens(tokenId, amount) {
   const initialSupply = await this.queryTokenFunction("totalSupply", tokenId);
-  // Create the transaction and freeze for manual signing
 
+  // Create the transaction and freeze for manual signing
   const treasuryClient = Client.forTestnet();
   treasuryClient.setOperator(this.treasuryAccountId, this.treasuryAccountPrivateKey);
 
@@ -212,12 +204,10 @@ async mintTokens(tokenId, amount) {
   // Get the transaction consensus status
   const transactionStatus = receipt.status.toString();
 
-  console.log("The mint transaction consensus status is ", transactionStatus);
+  console.log(`The mint transaction consensus status is ${transactionStatus}`);
 
   const finalSupply = await this.queryTokenFunction("totalSupply", tokenId);
 
-  console.log(`initialSupply  : ${initialSupply}`)
-  console.log(`finalSupply  : ${finalSupply}`)
   assert(finalSupply.equals(initialSupply.add(amount)),
     `Initial supply was ${initialSupply}, after minting ${amount} tokens`
     + ` final supply should be ${initialSupply.add(amount)}, was ${finalSupply}`);
@@ -225,8 +215,6 @@ async mintTokens(tokenId, amount) {
 
 async createTestToken(name, symbol, supply, fixedSupply) {
   // Create the transaction and freeze for manual signing
-  console.log(`adminUser ----> ${JSON.stringify(this.adminUser)}`)
-  console.log(`supplyUser ----> ${JSON.stringify(this.supplyUser)}`)
   const transaction = new TokenCreateTransaction()
       .setTokenName(name)
       .setTokenSymbol(symbol)
@@ -257,12 +245,12 @@ async createTestToken(name, symbol, supply, fixedSupply) {
 
   this.testTokenId = tokenId;
 
-  console.log("The new token ID is " + tokenId);
+  console.log(`The new token ID is ${tokenId}`);
 
   const tokenName = await this.queryTokenFunction("name", tokenId);
   const tokenSymbol = await this.queryTokenFunction("symbol", tokenId);
   const tokenSupply = await this.queryTokenFunction("totalSupply", tokenId);
-  console.log('The total supply of the ' + tokenName + ' token is ' + tokenSupply + ' of ' + tokenSymbol);
+  console.log(`The total supply of the ${tokenName} token is ${tokenSupply} of ${tokenSymbol}`);
 
   // Create the query
   const balanceQuery = new AccountBalanceQuery()
@@ -270,9 +258,8 @@ async createTestToken(name, symbol, supply, fixedSupply) {
 
   // Sign with the client operator private key and submit to a Hedera network
   const tokenBalance = await balanceQuery.execute(this.client);
-
-  console.log("The balance of the user is: " + tokenBalance.tokens.get(tokenId));
-
+  const userBalance = tokenBalance.tokens.get(tokenId);
+  console.log(`The balance of the user is: ${userBalance}`);
 }
 
 async queryTokenBalance(accountId, tokenId) {
@@ -280,14 +267,10 @@ async queryTokenBalance(accountId, tokenId) {
         .setAccountId(accountId);
 
     const accountBalances = await balanceQuery.execute(this.client);
-
     return accountBalances.tokens.get(tokenId);
 }
 
-async createTokenTransferTransaction (
-  client, sourceAccountId, sourceAccountPrivateKey,
-  targetAccountId, tokenId, amount
-) {
+async createTokenTransferTransaction (client, sourceAccountId, sourceAccountPrivateKey, targetAccountId, tokenId, amount) {
   const tokenTransferTx = await new TransferTransaction()
     .addTokenTransfer(tokenId, sourceAccountId, -amount)
     .addTokenTransfer(tokenId, targetAccountId, amount)
@@ -323,8 +306,7 @@ async associateAccountWithToken (client, tokenId, targetAccountId, targetAccount
     }
 }
 
-async transferTokens(client, tokenId, amount, targetAccountId,
-                              treasuryAccountId, treasuryAccountPrivateKey) {
+async transferTokens(client, tokenId, amount, targetAccountId, treasuryAccountId, treasuryAccountPrivateKey) {
   const tokenTransferTx = await new TransferTransaction()
     .addTokenTransfer(tokenId, treasuryAccountId, -amount)
     .addTokenTransfer(tokenId, targetAccountId, amount)
@@ -343,32 +325,27 @@ async createTopic(memo, submitKey) {
       .setAutoRenewAccountId(this.myAccountId)
       .execute(this.client);
     const receipt = await transactionId.getReceipt(this.client);
-
-    console.log(`\n============ TopicCreateTransaction: ${JSON.stringify(receipt)}`);
-
     const topicId = receipt.topicId;
-
-    console.log(`\n ======== New topic ID is ${topicId.toString()}`);
-
+    console.log(`New topic ID is ${topicId.toString()}`);
     this.testTopicId = topicId;
 }
 
 async publishMessage(message) {
   const client = Client.forTestnet();
   client.setOperator(this.firstAccountId, this.firstAccountPrivateKey);
+
   // Submit the message to the topic
   const transactionId = await new TopicMessageSubmitTransaction()
     .setTopicId(this.testTopicId)
     .setMessage(message)
-    .freezeWith(this.client); // Freeze the transaction to allow manual signing
+    .freezeWith(this.client);
 
   // Sign with the submit key
   const signTx = await transactionId.sign(this.firstAccountPrivateKey);
 
   // Execute the transaction
   const receipt = await signTx.execute(this.client);
-
-  console.log(`\n ======== The status of message submission: ${JSON.stringify(receipt)}`);
+  console.log(`The status of message submission: ${JSON.stringify(receipt)}`);
 }
 
 async receiveMessage() {
@@ -382,7 +359,7 @@ async receiveMessage() {
     .subscribe(
       this.client,
       (message) => {
-        console.log(`=============== Received message: ${message.contents}`);
+        console.log(`Received message: ${message.contents}`);
         subscriptionHandle.unsubscribe();
       },
       (error) => {
@@ -407,7 +384,7 @@ Given('A first hedera account with more than {int} hbar and {int} HTT tokens',
     await gs.checkMinHbarAmount(gs.firstAccountId, minHbarAmount);
     await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.firstAccountId, gs.firstAccountPrivateKey);
     await gs.transferTokens(gs.client, gs.testTokenId, httAmount, gs.firstAccountId,
-                         gs.treasuryAccountId, gs.treasuryAccountPrivateKey);
+                            gs.treasuryAccountId, gs.treasuryAccountPrivateKey);
   }
 );
 
@@ -520,7 +497,7 @@ Then('An attempt to mint tokens fails', async function () {
     await gs.mintTokens(gs.testTokenId, 10000);
     throw new Error("Should throw TOKEN_MAX_SUPPLY_REACHED");
   } catch (error) {
-    console.log(`error: ${JSON.stringify(error)}`);
+    console.log(`error minting token: ${JSON.stringify(error)}`);
     // OK, expected.
   }
   await gs.checkTokenTotalSupply(gs.testTokenId, initialSupply.toInt());
@@ -546,7 +523,6 @@ Then('The fourth account holds {int} HTT tokens', async function (amount) {
   const actualAmount = await gs.queryTokenBalance(gs.fourthAccountId, gs.testTokenId);
   assert(actualAmount == amount, `Fourth account holds ${actualAmount} HTT, expected ${amount}`)
 });
-
 
 When('The first account creates a transaction to transfer {int} HTT tokens to the second account',
   async function (amount) {
@@ -609,7 +585,6 @@ When('A transaction is created to transfer {int} HTT tokens out of the first and
 
     await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.thirdAccountId, gs.thirdAccountPrivateKey);
     await gs.associateAccountWithToken (gs.client, gs.testTokenId, gs.fourthAccountId, gs.fourthAccountPrivateKey);
-
 
     const nodeId = AccountId.fromString("0.0.3");
 
