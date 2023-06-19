@@ -18,7 +18,9 @@ MY_PRIVATE_KEY = 30300aaaaaaaaaaaaa2aa1aaaaaaaaaa0aaaa8a6aaaaaf1a8aaaaa1aa4aa3aa
 
 Create your account, private key and test HBAR necessery to execute the transactions using Hedera Testnet faucet.
 
-Next:
+Next run the following `npm` commands in your terminal.
+Make sure you have `node` version `18.9`.
+It is recommended to use `nvm` to manage `node` versions.
 
 ```
 npm install
