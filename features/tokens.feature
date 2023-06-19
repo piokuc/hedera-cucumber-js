@@ -7,7 +7,7 @@ Feature: Token Service Use Cases
     When I create a token named Test Token (HTT)
     Then The token has the name "Test Token"
     And The token has the symbol "HTT"
-    And The token has 2 decimals
+    And The token has 0 decimals
     And The token is owned by the account
     And An attempt to mint 100 additional tokens succeeds
 
@@ -17,7 +17,7 @@ Feature: Token Service Use Cases
     Then The total supply of the token is 1000
     And The token has the name "Test Token"
     And The token has the symbol "HTT"
-    And The token has 2 decimals
+    And The token has 0 decimals
     And The token is owned by the account
     And An attempt to mint tokens fails
 
