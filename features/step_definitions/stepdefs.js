@@ -46,11 +46,16 @@ class GlobalState {
 
   constructor() {
     this.myAccountId = process.env.MY_ACCOUNT_ID;
-    this.myPrivateKey = PrivateKey.fromString(process.env.MY_PRIVATE_KEY);
 
-    if (!this.myAccountId || !this.myPrivateKey) {
-      throw new Error("Environment variables MY_ACCOUNT_ID and MY_PRIVATE_KEY must be present");
+    if (!this.myAccountId) {
+      throw new Error("Environment variable MY_ACCOUNT_ID must be set to a Hedera Testnet account Id");
     }
+
+    if (! process.env.MY_PRIVATE_KEY) {
+      throw new Error("Environment variable MY_PRIVATE_KEY must be present");
+    }
+
+    this.myPrivateKey = PrivateKey.fromString(process.env.MY_PRIVATE_KEY);
 
     this._accountByName = {}
     this._accountByName["admin"] = new Account(this.myAccountId, this.myPrivateKey);
@@ -80,6 +85,7 @@ class GlobalState {
     } catch (e) {
       this._initialised = false;
       console.log(`Failed to _initialise: ${e}`);
+      throw e;
     }
   }
 
@@ -139,22 +145,6 @@ async balance(account) {
   return accountBalanceHbar;
 }
 
-async checkMinHbarAmount(accountId, minHbarAmount) {
-    // Create the query
-    const query = new AccountBalanceQuery()
-     .setAccountId(accountId);
-
-    const accountBalance = await query.execute(this.client);
-    const accountBalanceHbar = accountBalance.hbars.toBigNumber().toNumber();
-    if (accountBalance) {
-        console.log(`The account balance for account ${accountId} is ${accountBalanceHbar} HBar`);
-        //console.log("All account Info:")
-        //console.log(JSON.stringify(accountBalance));
-    }
-  assert(accountBalanceHbar >= minHbarAmount,
-    `Account should have at least ${minHbarAmount} but has only ${accountBalanceHbar}`)
-}
-
 async queryTokenFunction(functionName, tokenId) {
     const query = new TokenInfoQuery()
         .setTokenId(tokenId);
@@ -191,7 +181,6 @@ async checkTokenHasDecimals(tokenId, decimals) {
 
 async checkTokenAdminKey(tokenId, adminKey) {
   const tokenAdminKey = await this.queryTokenFunction("adminKey", tokenId);
-
   assert(adminKey.toString() === tokenAdminKey.toString(),
    `Test token has adminKey "${tokenAdminKey}", expected "${adminKey}"`)
   return true;
@@ -204,15 +193,10 @@ async checkTokenTotalSupply(tokenId, totalSupply) {
   );
 }
 
-_treasuryClient() {
-}
-
 async mintTokens(tokenId, amount) {
   await this._initialise();
 
   const initialSupply = await this.queryTokenFunction("totalSupply", tokenId);
-
-  // Create the transaction and freeze for manual signing
 
   const transaction = new TokenMintTransaction()
         .setTokenId(tokenId)
@@ -262,8 +246,9 @@ async createTestToken(name, symbol, supply, fixedSupply) {
       .setSupplyKey(adminAccount.publicKey);
 
   if (fixedSupply) {
-    transaction.setMaxSupply(supply);
-    transaction.setSupplyType(TokenSupplyType.Finite);
+    transaction
+      .setMaxSupply(supply)
+      .setSupplyType(TokenSupplyType.Finite);
   }
 
   transaction.freezeWith(this.client);
@@ -313,8 +298,8 @@ async createTokenTransferTransaction (sourceAccount, targetAccount, tokenId, amo
     .addTokenTransfer(tokenId, sourceAccount.id, -amount)
     .addTokenTransfer(tokenId, targetAccount.id, amount)
     .freezeWith(this.client)
-    .sign(sourceAccount.privateKey);
-  return tokenTransferTx;  
+    .sign(amount > 0 ? sourceAccount.privateKey : targetAccount.privateKey);
+  return tokenTransferTx;
 }
 
 async submitTransaction(client, tokenTransferTx) {
@@ -330,13 +315,11 @@ async associateAccountWithToken (tokenId, account) {
     .freezeWith(this.client)
     .sign(account.privateKey);
 
-  // Submit the transaction.
   const associateTxSubmit = await associateTx.execute(this.client);
 
-  // Get the receipt of the transaction.
-  const associateRx = await associateTxSubmit.getReceipt(this.client);
+  const receipt = await associateTxSubmit.getReceipt(this.client);
 
-  console.log(`Token association with account: ${associateRx.status}`);
+  console.log(`Token association with account: ${receipt.status}`);
 }
 
 async setTokenBalance(tokenId, account, balance) {
@@ -361,8 +344,8 @@ async transferTokens(tokenId, amount, targetAccount, treasuryAccount) {
     .sign(treasuryAccount.privateKey);
 
   const tokenTransferSubmit = await tokenTransferTx.execute(this.client);
-  const tokenTransferRx = await tokenTransferSubmit.getReceipt(this.client);
-  console.log("transfer tokens: ${tokenTransferRx}");
+  const receipt = await tokenTransferSubmit.getReceipt(this.client);
+  console.log(`transfer tokens: ${receipt.status}`);
 }
 
 async createTopic(memo, submitKey) {
@@ -395,7 +378,7 @@ async publishMessage(message, account) {
 
   // Execute the transaction
   const receipt = await signTx.execute(this.client);
-  console.log(`The status of message submission: ${JSON.stringify(receipt)}`);
+  console.log(`The status of message submission: ${receipt.status}`);
 }
 
 async receiveMessage() {
@@ -413,7 +396,7 @@ async receiveMessage() {
         subscriptionHandle.unsubscribe();
       },
       (error) => {
-        console.error(`Error receiving message: ${JSON.stringify(error)}`);
+        console.error(`Error receiving message: ${error}`);
         throw new Error(`Error receiving topic message: ${error}`);
       }
     );
@@ -459,7 +442,7 @@ Given('The first account holds {int} HTT tokens', async function (httAmount) {
 When('A topic is created with the memo {string} with the first account as the submit key',
   async function (memo) {
     const initialHbarAmountOfSubmitKeyAccount = 10;
-    await gs.createTopic(memo, await gs.account("first").publicKey);
+    await gs.createTopic(memo, (await gs.account("first")).publicKey);
 });
 
 When('The message {string} is published to the topic', async function (message) {
@@ -479,15 +462,11 @@ Given('A {int} of {int} threshold key with the first and second account',
     assert(numberOfKeys === 2, "The way the step is defined currently requires number of keys to be 2 (first and second account)");
     assert(requiredSignatures == 1 || requiredSignatures == 2, "Currently requiredSignatures can only be 1 or 2");
 
-    const l = [];
-    l.push(await gs.account("first"));
-    l.push(await gs.account("second"));
+    const publicKeys = [];
+    publicKeys.push((await gs.account("first")).publicKey);
+    publicKeys.push((await gs.account("second")).publicKey);
 
-    //const l = [await gs.account("first").publicKey, await gs.account("second").publicKey]
-
-    const ll = l.map((a) => a.publicKey);
-
-    gs.thresholdKey = new KeyList(ll, requiredSignatures);
+    gs.thresholdKey = new KeyList(publicKeys, requiredSignatures);
     console.log(`threshold key: ${gs.thresholdKey}`);
 });
 
@@ -540,8 +519,8 @@ Then('An attempt to mint tokens fails', async function () {
     await gs.mintTokens(gs.testTokenId, 10000);
     throw new Error("Should throw TOKEN_MAX_SUPPLY_REACHED");
   } catch (error) {
+    // OK, exception expected.
     console.log(`error minting token: ${JSON.stringify(error)}`);
-    // OK, expected.
   }
   await gs.checkTokenTotalSupply(gs.testTokenId, initialSupply.toInt());
 });
@@ -577,10 +556,10 @@ When('The first account creates a transaction to transfer {int} HTT tokens to th
 
 When('The first account submits the transaction', async function () {
   const client = Client.forTestnet();
-  const a1 = await gs.account("first");
-  client.setOperator(a1.id, a1.privateKey);
+  const firstAccount = await gs.account("first");
+  client.setOperator(firstAccount.id, firstAccount.privateKey);
 
-  await gs.tokenTransferTransaction.sign(a1.privateKey)
+  await gs.tokenTransferTransaction.sign(firstAccount.privateKey)
   const tokenTransferReceipt = await gs.submitTransaction(client, gs.tokenTransferTransaction); 
 });
 
