@@ -29,8 +29,8 @@ Feature: Token Service Use Cases
     And The second account holds 0 HTT tokens
     When The first account creates a transaction to transfer 10 HTT tokens to the second account
     And The first account submits the transaction
-    Then The second account holds 10 HTT tokens
-    And The first account holds 90 HTT tokens
+    Then The second account should hold 10 HTT tokens
+    And The first account should hold 90 HTT tokens
 
   Scenario: Create a token transfer transaction paid for by the recipient
     Given A first hedera account with more than 100 hbar
@@ -40,8 +40,8 @@ Feature: Token Service Use Cases
     And The first account holds 0 HTT tokens
     When The second account creates a transaction to transfer 10 HTT tokens to the first account
     And The first account submits the transaction
-    Then The second account holds 90 HTT tokens
-    And The first account holds 10 HTT tokens
+    Then The second account should hold 90 HTT tokens
+    And The first account should hold 10 HTT tokens
     And The first account has paid for the transaction fee
 
   Scenario: Create a multi party token transfer transaction
@@ -52,8 +52,8 @@ Feature: Token Service Use Cases
     And A fourth Hedera account with 0 hbar and 100 HTT tokens
     When A transaction is created to transfer 10 HTT tokens out of the first and second account and 5 HTT tokens into the third account and 15 HTT tokens into the fourth account
     And The first account submits the transaction
-    Then The first account holds 90 HTT tokens
-    And The second account holds 90 HTT tokens
-    And The third account holds 105 HTT tokens
-    And The fourth account holds 115 HTT tokens
+    Then The first account should hold 90 HTT tokens
+    And The second account should hold 90 HTT tokens
+    And The third account should hold 105 HTT tokens
+    And The fourth account should hold 115 HTT tokens
 

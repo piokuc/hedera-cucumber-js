@@ -151,21 +151,47 @@ Given('A second Hedera account', async function () {
   await gs.initAccount("second", 0)
 });
 
-Given('The second account holds {int} HTT tokens', async function (amount) {
-  const secondAccount = await gs.account("second");
-  await gs.token.setTokenBalance(gs.token.testTokenId, secondAccount, amount);
+Given('The second account holds {int} HTT tokens', async function (httAmount) {
+    const secondAccount = await gs.account("second");
+    await gs.token.setTokenBalance(gs.token.testTokenId, secondAccount, httAmount);
 });
 
-Then('The third account holds {int} HTT tokens', async function (amount) {
+Then('The third account holds {int} HTT tokens', async function (httAmount) {
+    const thirdAccount = await gs.account("third");
+    await gs.token.setTokenBalance(gs.token.testTokenId, thirdAccount, httAmount);
+});
+
+Then('The fourth account holds {int} HTT tokens', async function (httAmount) {
+    const fourthAccount = await gs.account("fourth");
+    await gs.token.setTokenBalance(gs.token.testTokenId, fourthAccount, httAmount);
+});
+
+
+Then('The first account should hold {int} HTT tokens', async function (httAmount) {
+  const firstAccount = await gs.account("first");
+  const actualAmount = await gs.token.queryTokenBalance(firstAccount.id, gs.token.testTokenId);
+  assert(actualAmount == httAmount, `First account holds ${actualAmount} HTT, expected ${httAmount}`)
+});
+
+
+Then('The second account should hold {int} HTT tokens', async function (httAmount) {
+  const secondAccount = await gs.account("second");
+  const actualAmount = await gs.token.queryTokenBalance(secondAccount.id, gs.token.testTokenId);
+  assert(actualAmount == httAmount, `Second account holds ${actualAmount} HTT, expected ${httAmount}`)
+});
+
+
+Then('The third account should hold {int} HTT tokens', async function (httAmount) {
   const thirdAccount = await gs.account("third");
   const actualAmount = await gs.token.queryTokenBalance(thirdAccount.id, gs.token.testTokenId);
-  assert(actualAmount == amount, `Third account holds ${actualAmount} HTT, expected ${amount}`)
+  assert(actualAmount == httAmount, `Third account holds ${actualAmount} HTT, expected ${httAmount}`)
 });
 
-Then('The fourth account holds {int} HTT tokens', async function (amount) {
+
+Then('The fourth account should hold {int} HTT tokens', async function (httAmount) {
   const fourthAccount = await gs.account("fourth");
   const actualAmount = await gs.token.queryTokenBalance(fourthAccount.id, gs.token.testTokenId);
-  assert(actualAmount == amount, `Fourth account holds ${actualAmount} HTT, expected ${amount}`)
+  assert(actualAmount == httAmount, `Fourth account holds ${actualAmount} HTT, expected ${httAmount}`)
 });
 
 When('The first account creates a transaction to transfer {int} HTT tokens to the second account',
