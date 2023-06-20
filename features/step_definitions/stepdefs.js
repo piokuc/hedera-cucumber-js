@@ -9,29 +9,11 @@ const { ConsensusService } = require("./consensus.js");
 setDefaultTimeout(60 * 1000);
 
 const {
-    TopicCreateTransaction,
-    TokenCreateTransaction,
-    TokenMintTransaction,
-    AccountCreateTransaction,
-    TokenType,
-    TokenInfoQuery,
     Client,
-    AccountBalanceQuery,
-    PrivateKey,
-    Wallet,
-    HbarUnit,
-    Hbar,
-    TokenSupplyType,
-    TokenAssociateTransaction,
     TransferTransaction,
-    StatusError,
     AccountId,
-    TopicMessageSubmitTransaction,
-    TopicMessageQuery,
     KeyList,
-    AccountDeleteTransaction
 } = require("@hashgraph/sdk");
-
 
 
 class GlobalState extends AccountsManager {
@@ -47,9 +29,9 @@ class GlobalState extends AccountsManager {
 
 const gs = new GlobalState();
 
-
 /////////////////////////////////////////////////////////////////////
 ////////////////////// Step definitions /////////////////////////////
+/////////////////////////////////////////////////////////////////////
 
 Given('A first hedera account with more than {int} hbar and {int} HTT tokens',
   async function (minHbarAmount, httAmount) {
