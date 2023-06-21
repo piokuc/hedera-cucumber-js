@@ -33,37 +33,42 @@ const gs = new GlobalState();
 ////////////////////// Step definitions /////////////////////////////
 /////////////////////////////////////////////////////////////////////
 
-Given('A first hedera account with more than {int} hbar and {int} HTT tokens',
-  async function (minHbarAmount, httAmount) {
-    await gs.initAccount("first", minHbarAmount + 1)
-    await gs.token.setTokenBalance(gs.token.testTokenId, await gs.account("first"), httAmount);
+Given('A/a {word} hedera account with more than {int} hbar and {int} HTT tokens',
+  async function (accountName, minHbarAmount, httAmount) {
+    await gs.initAccount(accountName, minHbarAmount + 1)
+    await gs.token.setTokenBalance(gs.token.testTokenId, await gs.account(accountName), httAmount);
   }
 );
 
-Given('a first account with more than {int} hbars', async function (minHbarAmount) {
-  await gs.initAccount("first", minHbarAmount + 1)
+Given('A/a {word} account with more than {int} hbar(s)', async function (accountName, minHbarAmount) {
+  await gs.initAccount(accountName, minHbarAmount + 1)
+  await gs.initAccount(accountName, minHbarAmount + 1)
 });
 
-Given('A first account with more than {int} hbars', async function (minHbarAmount) {
-  await gs.initAccount("first", minHbarAmount + 1)
+Given('A/a {word} hedera account with more than {int} hbar(s)', async function (accountName, minHbarAmount) {
+  await gs.initAccount(accountName, minHbarAmount + 1)
 });
 
-Given('A Hedera account with more than {int} hbar', async function (minHbarAmount) {
-  await gs.initAccount("first", minHbarAmount + 1)
+Given('A {word} Hedera account with {int} hbar(s) and {int} HTT token(s)',
+  async function (accountName, hbarAmount, httAmount) {
+    await gs.initAccount(accountName, hbarAmount);
+    await gs.token.setTokenBalance(gs.token.testTokenId, await gs.account(accountName), httAmount);
 });
 
-Given('A first hedera account with more than {int} hbar', async function (minHbarAmount) {
-  await gs.initAccount("first", minHbarAmount + 1)
+Given('A {word} Hedera account', async function (accountName) {
+  // Initial HBAR balance not specified, let's assume it's 0.
+  await gs.initAccount(accountName, 0)
 });
 
-Given('The first account holds {int} HTT tokens', async function (httAmount) {
-    const firstAccount = await gs.account("first");
-    await gs.token.setTokenBalance(gs.token.testTokenId, firstAccount, httAmount);
+
+Given('The {word} account holds {int} HTT tokens', async function (accountName, httAmount) {
+    const account = await gs.account(accountName);
+    await gs.token.setTokenBalance(gs.token.testTokenId, account, httAmount);
 });
 
-When('A topic is created with the memo {string} with the first account as the submit key',
-  async function (memo) {
-    await gs.consensus.createTopic(memo, (await gs.account("first")).publicKey);
+When('A topic is created with the memo {string} with the {word} account as the submit key',
+  async function (memo, accountName) {
+    await gs.consensus.createTopic(memo, (await gs.account(accountName)).publicKey);
 });
 
 When('The message {string} is published to the topic', async function (message) {
@@ -74,18 +79,14 @@ Then('The message is received by the topic and can be printed to the console', a
   await gs.consensus.receiveMessage();
 });
 
-Given('A second account with more than {int} hbars', async function (minHbarAmount) {
-  await gs.initAccount("second", minHbarAmount + 1)
-});
-
-Given('A {int} of {int} threshold key with the first and second account',
-  async function (requiredSignatures, numberOfKeys) {
+Given('A {int} of {int} threshold key with the {word} and {word} account',
+  async function (requiredSignatures, numberOfKeys, firstAccountName, secondAccountName) {
     assert(numberOfKeys === 2, "The way the step is defined currently requires number of keys to be 2 (first and second account)");
     assert(requiredSignatures == 1 || requiredSignatures == 2, "Currently requiredSignatures can only be 1 or 2");
 
     const publicKeys = [];
-    publicKeys.push((await gs.account("first")).publicKey);
-    publicKeys.push((await gs.account("second")).publicKey);
+    publicKeys.push((await gs.account(firstAccountName)).publicKey);
+    publicKeys.push((await gs.account(secondAccountName)).publicKey);
 
     gs.thresholdKey = new KeyList(publicKeys, requiredSignatures);
     console.log(`threshold key: ${gs.thresholdKey}`);
@@ -146,108 +147,42 @@ Then('An attempt to mint tokens fails', async function () {
   await gs.token.checkTokenTotalSupply(gs.token.testTokenId, initialSupply.toInt());
 });
 
-Given('A second Hedera account', async function () {
-  // Initial HBAR balance not specified, let's assume it's 0.
-  await gs.initAccount("second", 0)
+Then('The {word} account should hold {int} HTT tokens', async function (accountName, httAmount) {
+  const account = await gs.account(accountName);
+  const actualAmount = await gs.token.queryTokenBalance(account.id, gs.token.testTokenId);
+  assert(actualAmount == httAmount, `${accountName} account holds ${actualAmount} HTT, expected ${httAmount}`)
 });
 
-Given('The second account holds {int} HTT tokens', async function (httAmount) {
-    const secondAccount = await gs.account("second");
-    await gs.token.setTokenBalance(gs.token.testTokenId, secondAccount, httAmount);
-});
-
-Then('The third account holds {int} HTT tokens', async function (httAmount) {
-    const thirdAccount = await gs.account("third");
-    await gs.token.setTokenBalance(gs.token.testTokenId, thirdAccount, httAmount);
-});
-
-Then('The fourth account holds {int} HTT tokens', async function (httAmount) {
-    const fourthAccount = await gs.account("fourth");
-    await gs.token.setTokenBalance(gs.token.testTokenId, fourthAccount, httAmount);
-});
-
-
-Then('The first account should hold {int} HTT tokens', async function (httAmount) {
-  const firstAccount = await gs.account("first");
-  const actualAmount = await gs.token.queryTokenBalance(firstAccount.id, gs.token.testTokenId);
-  assert(actualAmount == httAmount, `First account holds ${actualAmount} HTT, expected ${httAmount}`)
-});
-
-
-Then('The second account should hold {int} HTT tokens', async function (httAmount) {
-  const secondAccount = await gs.account("second");
-  const actualAmount = await gs.token.queryTokenBalance(secondAccount.id, gs.token.testTokenId);
-  assert(actualAmount == httAmount, `Second account holds ${actualAmount} HTT, expected ${httAmount}`)
-});
-
-
-Then('The third account should hold {int} HTT tokens', async function (httAmount) {
-  const thirdAccount = await gs.account("third");
-  const actualAmount = await gs.token.queryTokenBalance(thirdAccount.id, gs.token.testTokenId);
-  assert(actualAmount == httAmount, `Third account holds ${actualAmount} HTT, expected ${httAmount}`)
-});
-
-
-Then('The fourth account should hold {int} HTT tokens', async function (httAmount) {
-  const fourthAccount = await gs.account("fourth");
-  const actualAmount = await gs.token.queryTokenBalance(fourthAccount.id, gs.token.testTokenId);
-  assert(actualAmount == httAmount, `Fourth account holds ${actualAmount} HTT, expected ${httAmount}`)
-});
-
-When('The first account creates a transaction to transfer {int} HTT tokens to the second account',
-  async function (amount) {
+When('The {word} account creates a transaction to transfer {int} HTT tokens to the {word} account',
+  async function (firstAccountName, amount, secondAccountName) {
     gs.token.tokenTransferTransaction = await gs.token.createTokenTransferTransaction(
-      await gs.account("first"), await gs.account("second"), gs.token.testTokenId, amount
+      await gs.account(firstAccountName), await gs.account(secondAccountName), gs.token.testTokenId, amount
     )
 });
 
-When('The first account submits the transaction', async function () {
+When('The {word} account submits the transaction', async function (accountName) {
   const client = Client.forTestnet();
-  const firstAccount = await gs.account("first");
-  client.setOperator(firstAccount.id, firstAccount.privateKey);
+  const account = await gs.account(accountName);
+  client.setOperator(account.id, account.privateKey);
 
-  await gs.token.tokenTransferTransaction.sign(firstAccount.privateKey)
+  await gs.token.tokenTransferTransaction.sign(account.privateKey)
   const submit = await gs.token.submitTransaction(client, gs.token.tokenTransferTransaction); 
 });
 
-When('The second account creates a transaction to transfer {int} HTT tokens to the first account', async function (amount) {
-    gs.token.tokenTransferTransaction = await gs.token.createTokenTransferTransaction(
-      await gs.account("second"), await gs.account("first"), gs.token.testTokenId, amount
-    )
-});
-
-Then('The first account has paid for the transaction fee', async function () {
+Then('The {word} account has paid for the transaction fee', async function (accountName) {
   // TODO
 });
 
-Given('A second Hedera account with {int} hbar and {int} HTT tokens',
-  async function (hbarAmount, httAmount) {
-    await gs.initAccount("second", hbarAmount);
-    await gs.token.setTokenBalance(gs.token.testTokenId, await gs.account("second"), httAmount);
-});
-
-Given('A third Hedera account with {int} hbar and {int} HTT tokens',
-  async function (hbarAmount, httAmount) {
-    await gs.initAccount("third", hbarAmount);
-    await gs.token.setTokenBalance(gs.token.testTokenId, await gs.account("third"), httAmount);
-});
-
-Given('A fourth Hedera account with {int} hbar and {int} HTT tokens',
-  async function (hbarAmount, httAmount) {
-    await gs.initAccount("fourth", hbarAmount);
-    await gs.token.setTokenBalance(gs.token.testTokenId, await gs.account("fourth"), httAmount);
-});
-
-When('A transaction is created to transfer {int} HTT tokens out of the first and second account'
-     +' and {int} HTT tokens into the third account'
-     +' and {int} HTT tokens into the fourth account',
-  async function (firstAndSecondOutflowAmount, thirdInflowAmount, fourthInflowAmount) {
+When('A transaction is created to transfer {int} HTT tokens out of the {word} and {word} account'
+     +' and {int} HTT tokens into the {word} account'
+     +' and {int} HTT tokens into the {word} account',
+  async function (firstAndSecondOutflowAmount, firstAccountName, secondAccountName, thirdInflowAmount, thirdAccountName, fourthInflowAmount, fourthAccountName) {
 
     // We need to choose a single, specific node for the multiple signatures to work.
     const nodeId = AccountId.fromString("0.0.3");
 
     const [a1, a2, a3, a4] = await Promise.all(
-      ["first", "second", "third", "fourth"]
+      [firstAccountName, secondAccountName, thirdAccountName, fourthAccountName]
       .map(async (n) => await gs.account(n))
     );
 
