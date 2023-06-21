@@ -52,10 +52,6 @@ class AccountsManager {
     this._initialised = true;
     try {
       await this.initAccount("treasury", 500);
-      await this.initAccount("first", 10);
-      await this.initAccount("second", 10);
-      await this.initAccount("third", 10);
-      await this.initAccount("fourth", 10);
     } catch (e) {
       this._initialised = false;
       console.log(`Failed to _initialise: ${e}`);
