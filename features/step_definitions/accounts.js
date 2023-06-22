@@ -20,6 +20,10 @@ class Account {
     this.publicKey = privateKey.publicKey;
     this.name = name;
   }
+
+  toString() {
+    return `[Account "${this.name}" (${this.name}, ${this.publicKey})]`;
+  }
 }
 
 
@@ -90,7 +94,7 @@ class AccountsManager {
       await this._initialise();
 
     if (! (name in this._accountByName)) {
-      this._accountByName[name] = await this._createAccount(hbarBalance);
+      this._accountByName[name] = await this._createAccount(name, hbarBalance);
       return;
     }
     const account = this._accountByName[name];
@@ -100,7 +104,7 @@ class AccountsManager {
     await this.transfer(await this.account("admin"), account, hbarBalance - balance)
   }
 
-  async _createAccount (initialBalance, name) {
+  async _createAccount (name, initialBalance) {
     const accountPrivateKey = PrivateKey.generateED25519();
   
     const response = await new AccountCreateTransaction()
