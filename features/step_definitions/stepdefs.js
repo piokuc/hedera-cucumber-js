@@ -34,14 +34,18 @@ const gs = new GlobalState();
 ////////////////////// Step definitions /////////////////////////////
 /////////////////////////////////////////////////////////////////////
 
-Given('A/a {word} hedera account with more than {int} hbar and {int} HTT tokens',
+Given('A/a {word} H/hedera account with more than {int} hbar and {int} HTT tokens',
   async function (accountName, minHbarAmount, httAmount) {
     await gs.initAccount(accountName, minHbarAmount + 1)
     await gs.token.setTokenBalance(gs.token.testTokenId, await gs.account(accountName), httAmount);
   }
 );
 
-Given('A/a {word} account with more than {int} hbar(s)', async function (accountName, minHbarAmount) {
+Given('A Hedera account with more than {int} hbar', async function (minHbarAmount) {
+  await gs.initAccount("first", minHbarAmount + 1)
+});
+
+Given('A/a {word} account with more than {int} hbars', async function (accountName, minHbarAmount) {
   await gs.initAccount(accountName, minHbarAmount + 1)
 });
 

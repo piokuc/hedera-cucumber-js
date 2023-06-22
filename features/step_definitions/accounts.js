@@ -22,7 +22,7 @@ class Account {
   }
 
   toString() {
-    return `[Account "${this.name}" (${this.name}, ${this.publicKey})]`;
+    return `[Account "${this.name}" (${this.id}, ${this.publicKey})]`;
   }
 }
 
@@ -113,11 +113,12 @@ class AccountsManager {
       .execute(this.client);
   
     const receipt = await response.getReceipt(this.client);
-    console.log(`_createAccount: ${receipt.status}`);
     if (receipt.status !== Status.Success) {
       throw new Error(`Minting account failed: ${receipt.status}`);
     }
-    return new Account(receipt.accountId, accountPrivateKey, name);
+    const newAccount = new Account(receipt.accountId, accountPrivateKey, name);
+    console.log(`_createAccount ${newAccount}: ${receipt.status}`);
+    return newAccount;
  }
 
   async balance(account) {
