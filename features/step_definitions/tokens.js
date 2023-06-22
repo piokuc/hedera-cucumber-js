@@ -22,7 +22,8 @@ const {
     TopicMessageSubmitTransaction,
     TopicMessageQuery,
     KeyList,
-    AccountDeleteTransaction
+    AccountDeleteTransaction,
+    Status
 } = require("@hashgraph/sdk");
 
 
@@ -42,7 +43,6 @@ class TokenService {
       const query = new TokenInfoQuery()
           .setTokenId(tokenId);
 
-      console.log(`Retrieving ${functionName}`);
       const body = await query.execute(this.client());
 
       const result = functionName === "name" ? body.name
@@ -51,6 +51,7 @@ class TokenService {
                   : functionName === "decimals" ? body.decimals
                   : functionName === "adminKey" ? body.adminKey
                   : null;
+      console.log(`queryTokenFunction: ${tokenId} ${functionName} => ${result}`);
       return result
   }
 
@@ -123,10 +124,10 @@ class TokenService {
   async createTestToken(name, symbol, supply, fixedSupply) {
     await this.accountsManager._initialise();
 
+    console.log(`createTestToken: ${name} (${symbol}), supply: ${supply}, fixedSupply: ${fixedSupply}`);
+
     const adminAccount = await this.accountsManager.account("admin");
     const treasuryAccount = await this.accountsManager.account("treasury");
-    assert(adminAccount);
-    assert(treasuryAccount);
 
     // Create the transaction and freeze for manual signing
     const transaction = new TokenCreateTransaction()
@@ -154,7 +155,9 @@ class TokenService {
 
     // Get the receipt of the transaction
     const receipt = await txResponse.getReceipt(this.client());
-    console.log(`Token create: ${receipt}`);
+    if(receipt.status !== Status.Success) {
+      throw new Error(`Token create: ${receipt.status}`);
+    }
 
     // Get the token ID from the receipt
     const tokenId = receipt.tokenId;
@@ -167,15 +170,6 @@ class TokenService {
     const tokenSymbol = await this.queryTokenFunction("symbol", tokenId);
     const tokenSupply = await this.queryTokenFunction("totalSupply", tokenId);
     console.log(`The total supply of the ${tokenName} token is ${tokenSupply} of ${tokenSymbol}`);
-
-    // Create the query
-    const balanceQuery = new AccountBalanceQuery()
-        .setAccountId(adminAccount.id);
-
-    // Sign with the client operator private key and submit to a Hedera network
-    const tokenBalance = await balanceQuery.execute(this.client());
-    const userBalance = tokenBalance.tokens.get(tokenId);
-    console.log(`The balance of the user is: ${userBalance}`);
   }
 
   async queryTokenBalance(accountId, tokenId) {

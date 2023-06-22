@@ -13,6 +13,7 @@ const {
     TransferTransaction,
     AccountId,
     KeyList,
+    Status
 } = require("@hashgraph/sdk");
 
 
@@ -141,7 +142,9 @@ Then('An attempt to mint tokens fails', async function () {
     throw new Error("Should throw TOKEN_MAX_SUPPLY_REACHED");
   } catch (error) {
     // OK, exception expected.
-    console.log(`error minting token: ${JSON.stringify(error)}`);
+    const status = error.status;
+    console.log(`error minting token: ${status.toString()}`);
+    assert(status === Status.TokenMaxSupplyReached, `Unexpected error while minting tokens: ${status.toString()}, expected: "TOKEN_MAX_SUPPLY_REACHED"`);
   }
   await gs.token.checkTokenTotalSupply(gs.token.testTokenId, initialSupply.toInt());
 });

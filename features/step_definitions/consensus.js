@@ -31,7 +31,7 @@ class ConsensusService {
         .setAutoRenewAccountId(this.accountsManager.myAccountId)
         .execute(this.client());
       const receipt = await transactionId.getReceipt(this.client());
-      console.log(`Topic create: ${JSON.stringify(receipt)}`);
+      console.log(`Topic create: ${receipt.status}`);
       const topicId = receipt.topicId;
       console.log(`New topic ID is ${topicId.toString()}`);
       this.testTopicId = topicId;
@@ -66,13 +66,13 @@ class ConsensusService {
       .setStartTime(0) // optional, this is unix timestamp (seconds since 1970-01-01T00:00:00Z)
       .subscribe(
         this.client(),
-        (message) => {
-          console.log(`Received message: ${message.contents}`);
-          subscriptionHandle.unsubscribe();
+        (message, error) => {
+          console.error(`Error receiving message: ${error.status}`);
+          throw new Error(`Error receiving topic message: ${error.status}`);
         },
-        (error) => {
-          console.error(`Error receiving message: ${error}`);
-          throw new Error(`Error receiving topic message: ${error}`);
+        (message) => {
+          console.log(`Received message: "${message.contents}"`);
+          subscriptionHandle.unsubscribe();
         }
       );
   }

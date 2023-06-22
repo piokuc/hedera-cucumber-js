@@ -8,6 +8,7 @@ const {
     PrivateKey,
     Hbar,
     TransferTransaction,
+    Status
 } = require("@hashgraph/sdk");
 require('dotenv').config({ path: '.env' });
 
@@ -75,10 +76,15 @@ class AccountsManager {
       .sign(hbarAmount > 0 ? sourceAccount.privateKey : targetAccount.privateKey);
       const txSubmit = await tx.execute(this.client);
       const receipt = await txSubmit.getReceipt(this.client);
-      console.log(`transfer HBAR: ${JSON.stringify(receipt)}`);
+      const transferDescription = `transfer HBAR: ${sourceAccount.id} => ${targetAccount.id} for ${hbarAmount} HBAR`;
+      if (receipt.status !== Status.Success) {
+        throw new Error(`${transferDescription}: ${receipt.status}`); 
+      }
+      console.log(`${transferDescription}: ${receipt.status}`);
   }
 
   async initAccount(name, hbarBalance) {
+    console.log(`initAccount: "${name}", initial HBAR balance: ${hbarBalance}`);
     if (!this._initialised)
       await this._initialise();
 
@@ -102,7 +108,10 @@ class AccountsManager {
       .execute(this.client);
   
     const receipt = await response.getReceipt(this.client);
-    console.log(`_createAccount: ${JSON.stringify(receipt)}`);
+    console.log(`_createAccount: ${receipt.status}`);
+    if (receipt.status !== Status.Success) {
+      throw new Error(`Minting account failed: ${receipt.status}`);
+    }
     return new Account(receipt.accountId, accountPrivateKey);
  }
 
