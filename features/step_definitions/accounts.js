@@ -14,10 +14,11 @@ require('dotenv').config({ path: '.env' });
 
 
 class Account {
-  constructor(accountId, privateKey) {
+  constructor(accountId, privateKey, name) {
     this.id = accountId;
     this.privateKey = privateKey;
     this.publicKey = privateKey.publicKey;
+    this.name = name;
   }
 }
 
@@ -39,7 +40,7 @@ class AccountsManager {
     this.myPrivateKey = PrivateKey.fromString(process.env.MY_PRIVATE_KEY);
 
     this._accountByName = {}
-    this._accountByName["admin"] = new Account(this.myAccountId, this.myPrivateKey);
+    this._accountByName["admin"] = new Account(this.myAccountId, this.myPrivateKey, "admin");
 
     // Create our connection to the Hedera network
     // The Hedera JS SDK makes this really easy!
@@ -76,7 +77,7 @@ class AccountsManager {
       .sign(hbarAmount > 0 ? sourceAccount.privateKey : targetAccount.privateKey);
       const txSubmit = await tx.execute(this.client);
       const receipt = await txSubmit.getReceipt(this.client);
-      const transferDescription = `transfer HBAR: ${sourceAccount.id} => ${targetAccount.id} for ${hbarAmount} HBAR`;
+      const transferDescription = `transfer HBAR: ${sourceAccount.name} (${sourceAccount.id}) => ${targetAccount.name} (${targetAccount.id}) for ${hbarAmount} HBAR`;
       if (receipt.status !== Status.Success) {
         throw new Error(`${transferDescription}: ${receipt.status}`); 
       }
@@ -99,7 +100,7 @@ class AccountsManager {
     await this.transfer(await this.account("admin"), account, hbarBalance - balance)
   }
 
-  async _createAccount (initialBalance) {
+  async _createAccount (initialBalance, name) {
     const accountPrivateKey = PrivateKey.generateED25519();
   
     const response = await new AccountCreateTransaction()
@@ -112,7 +113,7 @@ class AccountsManager {
     if (receipt.status !== Status.Success) {
       throw new Error(`Minting account failed: ${receipt.status}`);
     }
-    return new Account(receipt.accountId, accountPrivateKey);
+    return new Account(receipt.accountId, accountPrivateKey, name);
  }
 
   async balance(account) {
